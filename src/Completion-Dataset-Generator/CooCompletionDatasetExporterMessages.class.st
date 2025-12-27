@@ -6,13 +6,16 @@ CooCompletionDatasetExporterMessages
     exportOnPackages: #( 'Completion-Dataset-Generator' )
     heuristics: [ :builder | builder messageHeuristic ]
 	 context: #completion
-    to: 'completion-dataset.json'.
+    to: 'completion_ctx.json.json'.
+
+
 ```
 
 
+
 Available contexts
-- #completion:           	receiver expression and the requested prefix
-- #surroundingCompletion:	source up to the call site plus the requested prefix (default fallback)
+- #completion:           	receiver expression and the requested prefix (completion_ctx.json)
+- #surroundingCompletion:	source up to the call site plus the requested prefix (completion_surrounding_ctx.json)
 
 
 "
