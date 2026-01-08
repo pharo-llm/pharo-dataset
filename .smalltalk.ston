@@ -1,7 +1,7 @@
 SmalltalkCISpec {
   #loading : [
     SCIMetacelloLoadSpec {
-      #baseline : 'CompletionDatasetGenerator',
+      #baseline : 'HeuristicCompletionGenerator',
       #directory : 'src',
       #platforms : [ #pharo ]
     }
