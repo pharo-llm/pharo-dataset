@@ -83,7 +83,7 @@ CooCompletionDatasetExporterMessages class >> exportnec [
 		  to: 'completion-ctx-line-messages.json'
 ]
 
-{ #category : 'benchmarking' }
+{ #category : 'benchmarks' }
 CooCompletionDatasetExporterMessages >> benchCallsite: aMessageNode inMethod: aMethod atPosition: aPosition [
 
 	| originalSelector position |
@@ -124,7 +124,7 @@ CooCompletionDatasetExporterMessages >> buildCompletionFor: aMessageNode atPosit
 		  buildCompletion
 ]
 
-{ #category : 'benchmarking' }
+{ #category : 'benchmarks' }
 CooCompletionDatasetExporterMessages >> completionContextFor: aMessageNode withPrefix: prefix [
 
 	| receiver source |

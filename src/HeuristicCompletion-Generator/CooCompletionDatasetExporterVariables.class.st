@@ -83,7 +83,7 @@ CooCompletionDatasetExporterVariables class >> exportnec [
 		  to: 'completion-ctx-line-variables.json'
 ]
 
-{ #category : 'benchmarking' }
+{ #category : 'benchmarks' }
 CooCompletionDatasetExporterVariables >> benchCallsite: aVariableNode inMethod: aMethod atPosition: aPosition [
 
 	| originalName position |
@@ -124,7 +124,7 @@ CooCompletionDatasetExporterVariables >> buildCompletionFor: aVariableNode atPos
 		  buildCompletion
 ]
 
-{ #category : 'benchmarking' }
+{ #category : 'benchmarks' }
 CooCompletionDatasetExporterVariables >> completionContextFor: aVariableNode withPrefix: prefix [
 
 	^ prefix

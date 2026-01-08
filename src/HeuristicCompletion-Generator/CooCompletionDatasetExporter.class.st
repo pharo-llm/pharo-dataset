@@ -87,7 +87,7 @@ CooCompletionDatasetExporter >> entriesAsJsonString [
 			   yourself ])
 ]
 
-{ #category : 'accessing' }
+{ #category : 'initialization' }
 CooCompletionDatasetExporter >> initialize [
 
 	super initialize.
