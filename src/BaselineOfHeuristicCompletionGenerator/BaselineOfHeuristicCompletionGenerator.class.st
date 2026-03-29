@@ -14,7 +14,7 @@ BaselineOfHeuristicCompletionGenerator >> baseline: spec [
 		
 			spec
 				baseline: 'ExtendedHeuristicCompletionBenchmarks'
-				with: [ spec repository: 'github://omarabedelkader/HeuristicCompletion-Benchmarks/:main/repository' ].
+				with: [ spec repository: 'github://omarabedelkader/HeuristicCompletion-Benchmarks:main/repository' ].
 
 			spec package: 'HeuristicCompletion-Generator'.
 			spec package: 'HeuristicCompletion-Generator-Tests' with: [ spec requires: #( 'HeuristicCompletion-Generator' ) ] ]
