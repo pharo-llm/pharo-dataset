@@ -17,39 +17,19 @@ Class {
 }
 
 { #category : 'as yet unclassified' }
-CooCompletionDatasetExporterMessages class >> exportAllMessages [
+CooCompletionDatasetExporterMessages class >> exportAllMessagesInfillJsonl [
 
 	<script>
 	^ self
-		exportOnPackages: self defaultPackages
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporterMessages class >> exportAllMessagesInfill [
-
-	<script>
-	^ self
-		  exportOnPackages: self defaultPackages
-		  heuristics: [ :builder | builder messageHeuristic ]
+		  exportOnPackages: self defaultPackages1
+		  heuristics: [ :builder | builder messagesHeuristic ]
 		  context: #surroundingCompletion
 		  outputFormat: #infill
-		  to: 'infill-messages.json'
+		  toJsonl: 'infill-messages.jsonl'
 ]
 
 { #category : 'as yet unclassified' }
-CooCompletionDatasetExporterMessages class >> exportAllMessagesInfillWithClassContext [
-
-	<script>
-	^ self
-		  exportOnPackages: self defaultPackages
-		  heuristics: [ :builder | builder messageHeuristic ]
-		  context: #classCompletion
-		  outputFormat: #infill
-		  to: 'infill-class-ctx-messages.json'
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporterMessages class >> exportAllMessagesReranker [
+CooCompletionDatasetExporterMessages class >> exportAllMessagesRerankerJsonl [
 
 	<script>
 	^ self
@@ -57,18 +37,7 @@ CooCompletionDatasetExporterMessages class >> exportAllMessagesReranker [
 		  heuristics: [ :builder | builder messageHeuristic ]
 		  context: #surroundingCompletion
 		  outputFormat: #reranker
-		  to: 'reranker-messages.json'
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporterMessages class >> exportnec [
-
-	<script>
-	^ self
-		  exportOnPackages: #( 'NECompletion' )
-		  heuristics: [ :builder | builder messagesHeuristic ]
-		  context: #lineCompletion
-		  to: 'completion-ctx-line-messages.json'
+		  toJsonl: 'reranker-messages.jsonl'
 ]
 
 { #category : 'benchmarks' }
@@ -90,7 +59,7 @@ CooCompletionDatasetExporterMessages >> benchCallsite: aMessageNode inMethod: aM
 		              ifFalse: [ '' ].
 
 
-	2 to: (self maxPrefixSizeFor: originalSelector) do: [ :index |
+	{ (self maxPrefixSizeFor: originalSelector) } do: [ :index |
 			| prefix completion candidates context |
 			prefix := self extractPrefixFrom: originalSelector at: index.
 			target := originalSelector copyFrom: index + 1 to: originalSelector size.
@@ -106,12 +75,12 @@ CooCompletionDatasetExporterMessages >> benchCallsite: aMessageNode inMethod: aM
 				           atPosition: position
 				           withPrefix: prefix.
 
-				self
-			recordContext: context
-			suffix: suffixCode
-			target: target
-			candidates: candidates
-			correct: originalSelector ].
+			self
+				recordContext: context
+				suffix: suffixCode
+				target: target
+				candidates: candidates
+				correct: originalSelector ].
 
 	aMessageNode selectorNode value: originalSelector
 ]

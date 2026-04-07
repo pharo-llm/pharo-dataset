@@ -80,8 +80,7 @@ CooCompletionDatasetExporter class >> defaultPackages1 [
 ]
 
 { #category : 'as yet unclassified' }
-CooCompletionDatasetExporter class >> exportOnPackages: aCollectionOfPackages heuristics: aHeuristicsBlock context: aContextStrategy outputFormat: anOutputFormat to: aPathString [
-
+CooCompletionDatasetExporter class >> exportOnPackages: aCollectionOfPackages heuristics: aHeuristicsBlock context: aContextStrategy outputFormat: anOutputFormat toJsonl: aPathString [
 
 	| exporter |
 	exporter := self new
@@ -99,19 +98,8 @@ CooCompletionDatasetExporter class >> exportOnPackages: aCollectionOfPackages he
 		package ifNil: [ ^ self error: 'Package not found: ' , packageOrName printString ].
 		exporter scope: (CoBenchmarkPackage on: package).
 		exporter run ].
-	exporter writeToFileNamed: aPathString.
+	exporter writeToFileNamedAsJsonl: aPathString.
 	^ exporter
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporter class >> exportOnPackages: aCollectionOfPackages heuristics: aHeuristicsBlock context: aContextStrategy to: aPathString [
-
-	^ self
-		  exportOnPackages: aCollectionOfPackages
-		  heuristics: aHeuristicsBlock
-		  context: aContextStrategy
-		  outputFormat: #completion
-		  to: aPathString
 ]
 
 { #category : 'benchmarks' }
@@ -191,6 +179,18 @@ CooCompletionDatasetExporter >> entriesAsCompletionJsonString [
 			   yourself ])
 ]
 
+{ #category : 'accessing' }
+CooCompletionDatasetExporter >> entriesAsCompletionJsonlString [
+
+	^ String cr join: (entries collect: [ :entry |
+		   NeoJSONWriter toString: (Dictionary new
+				   at: 'context' put: (entry at: #context);
+				   at: 'candidates' put: (entry at: #candidates);
+				   at: 'fetchers' put: (entry at: #fetchers);
+				   at: 'correct' put: (entry at: #correct);
+				   yourself) ])
+]
+
 { #category : 'initialization' }
 CooCompletionDatasetExporter >> entriesAsInfillJsonString [
 
@@ -202,6 +202,17 @@ CooCompletionDatasetExporter >> entriesAsInfillJsonString [
 			   yourself ])
 ]
 
+{ #category : 'accessing' }
+CooCompletionDatasetExporter >> entriesAsInfillJsonlString [
+
+	^ String cr join: (entries collect: [ :entry |
+		   NeoJSONWriter toString: (Dictionary new
+				   at: 'prefix_code' put: (entry at: #context);
+				   at: 'suffix_code' put: (entry at: #suffix ifAbsent: [ '' ]);
+				   at: 'target' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
+				   yourself) ])
+]
+
 { #category : 'as yet unclassified' }
 CooCompletionDatasetExporter >> entriesAsJsonString [
 
@@ -210,6 +221,17 @@ CooCompletionDatasetExporter >> entriesAsJsonString [
 				  ([ #infill ] -> [ self entriesAsInfillJsonString ]).
 				  ([ #reranker ] -> [ self entriesAsRerankerJsonString ]) }
 		  otherwise: [ self entriesAsCompletionJsonString ]
+]
+
+{ #category : 'accessing' }
+CooCompletionDatasetExporter >> entriesAsJsonlString [
+	"Return entries serialized as JSONL (one JSON object per line), respecting the current outputFormat."
+
+	^ outputFormat
+		  caseOf: {
+				  ([ #infill ] -> [ self entriesAsInfillJsonlString ]).
+				  ([ #reranker ] -> [ self entriesAsRerankerJsonlString ]) }
+		  otherwise: [ self entriesAsCompletionJsonlString ]
 ]
 
 { #category : 'as yet unclassified' }
@@ -249,6 +271,45 @@ CooCompletionDatasetExporter >> entriesAsRerankerJsonString [
 			   at: 'language' put: 'Smalltalk';
 			   at: 'candidates' put: candidates;
 			   yourself ])
+]
+
+{ #category : 'accessing' }
+CooCompletionDatasetExporter >> entriesAsRerankerJsonlString [
+
+	^ String cr join: (entries collect: [ :entry |
+		   | correct candidateTexts fetchers candidates correctFound |
+		   correct := entry at: #correct.
+		   candidateTexts := entry at: #candidates.
+		   fetchers := entry at: #fetchers.
+		   correctFound := false.
+
+		   candidates := candidateTexts withIndex collect: [ :text :rank |
+			                   | isCorrect |
+			                   isCorrect := text = correct.
+			                   isCorrect ifTrue: [ correctFound := true ].
+			                   Dictionary new
+				                   at: 'text' put: text;
+				                   at: 'fetcher' put: (fetchers at: rank ifAbsent: [ '' ]);
+				                   at: 'baseline_rank' put: rank;
+				                   at: 'label' put: (isCorrect
+						                    ifTrue: [ 1 ]
+						                    ifFalse: [ 0 ]);
+				                   yourself ].
+
+		   correctFound ifFalse: [
+			   candidates := candidates copyWith: (Dictionary new
+					                    at: 'text' put: correct;
+					                    at: 'fetcher' put: '';
+					                    at: 'baseline_rank' put: candidates size + 1;
+					                    at: 'label' put: 1;
+					                    yourself) ].
+
+		   NeoJSONWriter toString: (Dictionary new
+				   at: 'context_before' put: (entry at: #context);
+				   at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
+				   at: 'language' put: 'Smalltalk';
+				   at: 'candidates' put: candidates;
+				   yourself) ])
 ]
 
 { #category : 'initialization' }
@@ -381,6 +442,18 @@ CooCompletionDatasetExporter >> writeToFileNamed: aString [
 		stream
 			truncate;
 			nextPutAll: self entriesAsCompletionJsonString ]
+]
+
+{ #category : 'accessing' }
+CooCompletionDatasetExporter >> writeToFileNamedAsJsonl: aString [
+
+	| reference |
+	reference := aString asFileReference.
+	reference parent ensureCreateDirectory.
+	reference writeStreamDo: [ :stream |
+		stream
+			truncate;
+			nextPutAll: self entriesAsJsonlString ]
 ]
 
 { #category : 'accessing' }

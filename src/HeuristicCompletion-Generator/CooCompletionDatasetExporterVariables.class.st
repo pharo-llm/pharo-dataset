@@ -16,58 +16,27 @@ Class {
 }
 
 { #category : 'as yet unclassified' }
-CooCompletionDatasetExporterVariables class >> exportAllVariables [
-
-	<script>
-	^ self
-		 exportOnPackages: self defaultPackages
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporterVariables class >> exportAllVariablesInfill [
-
-	<script>
-	^ self
-		  exportOnPackages: self defaultPackages
-		  heuristics: [ :builder | builder variablesHeuristic ]
-		  context: #surroundingCompletion
-		  outputFormat: #infill
-		  to: 'infill-variables.json'
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporterVariables class >> exportAllVariablesInfillWithClassContext [
-
-	<script>
-	^ self
-		  exportOnPackages: self defaultPackages
-		  heuristics: [ :builder | builder variablesHeuristic ]
-		  context: #classCompletion
-		  outputFormat: #infill
-		  to: 'infill-class-ctx-variables.json'
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporterVariables class >> exportAllVariablesReranker [
+CooCompletionDatasetExporterVariables class >> exportAllVariablesInfillJsonl [
 
 	<script>
 	^ self
 		  exportOnPackages: self defaultPackages1
 		  heuristics: [ :builder | builder variablesHeuristic ]
 		  context: #surroundingCompletion
-		  outputFormat: #reranker
-		  to: 'reranker-variables.json'
+		  outputFormat: #infill
+		  toJsonl: 'infill-variables.jsonl'
 ]
 
 { #category : 'as yet unclassified' }
-CooCompletionDatasetExporterVariables class >> exportnec [
+CooCompletionDatasetExporterVariables class >> exportAllVariablesRerankerJsonl [
 
 	<script>
 	^ self
-		  exportOnPackages: #( 'NECompletion' )
+		  exportOnPackages: self defaultPackages
 		  heuristics: [ :builder | builder variablesHeuristic ]
-		  context: #lineCompletion
-		  to: 'completion-ctx-line-variables.json'
+		  context: #surroundingCompletion
+		  outputFormat: #reranker
+		  toJsonl: 'reranker-variables.jsonl'
 ]
 
 { #category : 'benchmarks' }
@@ -78,15 +47,15 @@ CooCompletionDatasetExporterVariables >> benchCallsite: aVariableNode inMethod: 
 	position := (aPosition respondsTo: #first)
 		            ifTrue: [ aPosition first ]
 		            ifFalse: [ aPosition ].
-		
-		
+
+
 	source := aVariableNode methodNode source.
 	nodeEnd := position + originalName size - 1.
 	suffixCode := nodeEnd < source size
-		             ifTrue: [ source copyFrom: nodeEnd + 1 to: source size ]
-		             ifFalse: [ '' ].
+		              ifTrue: [ source copyFrom: nodeEnd + 1 to: source size ]
+		              ifFalse: [ '' ].
 
-	2 to: (self maxPrefixSizeFor: aVariableNode) do: [ :index |
+	{ (self maxPrefixSizeFor: aVariableNode) } do: [ :index |
 			| prefix completion candidates context |
 			prefix := self extractPrefixFrom: originalName at: index.
 			target := originalName copyFrom: index + 1 to: originalName size.
@@ -102,12 +71,12 @@ CooCompletionDatasetExporterVariables >> benchCallsite: aVariableNode inMethod: 
 				           atPosition: position
 				           withPrefix: prefix.
 
-				self
-			recordContext: context
-			suffix: suffixCode
-			target: target
-			candidates: candidates
-			correct: originalName ].
+			self
+				recordContext: context
+				suffix: suffixCode
+				target: target
+				candidates: candidates
+				correct: originalName ].
 
 	aVariableNode name: originalName
 ]
