@@ -87,7 +87,7 @@ CooCompletionDatasetExporterMessages class >> exportnec [
 CooCompletionDatasetExporterMessages >> benchCallsite: aMessageNode inMethod: aMethod atPosition: aPosition [
 
 	| originalSelector position |
-	originalSelector := aMessageNode selector.
+	originalSelector := aMessageNode selectorNode value.
 	position := (aPosition respondsTo: #first)
 		            ifTrue: [ aPosition first ]
 		            ifFalse: [ aPosition ].
@@ -95,7 +95,7 @@ CooCompletionDatasetExporterMessages >> benchCallsite: aMessageNode inMethod: aM
 	2 to: (self maxPrefixSizeFor: originalSelector) do: [ :index |
 		| prefix completion candidates context |
 		prefix := self extractPrefixFrom: originalSelector at: index.
-		aMessageNode selector: prefix.
+		aMessageNode selectorNode value: prefix.
 
 		completion := self buildCompletionFor: aMessageNode atPosition: position.
 
@@ -109,7 +109,7 @@ CooCompletionDatasetExporterMessages >> benchCallsite: aMessageNode inMethod: aM
 
 		self recordContext: context candidates: candidates correct: originalSelector ].
 
-	aMessageNode selector: originalSelector
+	aMessageNode selectorNode value: originalSelector
 ]
 
 { #category : 'benchmarks' }
