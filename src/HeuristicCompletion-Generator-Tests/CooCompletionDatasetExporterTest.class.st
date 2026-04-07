@@ -17,7 +17,7 @@ CooCompletionDatasetExporterTest >> testEntriesAsJsonStringSerializesEntries [
 				(CooCompletionDatasetExporterTestCandidate withContents: 'beta' fetcherName: 'type') }
 		correct: 'answer'.
 
-	json := exporter entriesAsJsonString.
+	json := exporter entriesAsCompletionJsonString.
 	data := NeoJSONReader fromString: json.
 
 	self assert: data size equals: 1.
