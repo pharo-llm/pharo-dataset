@@ -20,6 +20,16 @@ Class {
 }
 
 { #category : 'as yet unclassified' }
+CooCompletionFineTuningDatasetExporter class >> configureMessageHeuristicsOn: aBuilder [
+
+	(aBuilder respondsTo: #messagesHeuristic)
+		ifTrue: [ ^ aBuilder messagesHeuristic ].
+	(aBuilder respondsTo: #messageHeuristic)
+		ifTrue: [ ^ aBuilder messageHeuristic ].
+	self error: 'No message heuristic selector found on builder'
+]
+
+{ #category : 'as yet unclassified' }
 CooCompletionFineTuningDatasetExporter class >> defaultPackages [
 
 	^ CooCompletionDatasetExporter defaultPackages
@@ -32,13 +42,15 @@ CooCompletionFineTuningDatasetExporter class >> defaultPackages1 [
 ]
 
 { #category : 'as yet unclassified' }
-CooCompletionFineTuningDatasetExporter class >> configureMessageHeuristicsOn: aBuilder [
+CooCompletionFineTuningDatasetExporter class >> exportAllFIMJsonl [
 
-	(aBuilder respondsTo: #messagesHeuristic)
-		ifTrue: [ ^ aBuilder messagesHeuristic ].
-	(aBuilder respondsTo: #messageHeuristic)
-		ifTrue: [ ^ aBuilder messageHeuristic ].
-	self error: 'No message heuristic selector found on builder'
+	<script>
+	^ self
+		exportOnPackages: self defaultPackages1
+		context: #surroundingCompletion
+		outputFormat: #fim
+		qualityFilter: CooFimDataQualityFilter default
+		toJsonl: 'fim-messages-and-variables.jsonl'
 ]
 
 { #category : 'as yet unclassified' }
@@ -46,7 +58,7 @@ CooCompletionFineTuningDatasetExporter class >> exportAllRerankerJsonl [
 
 	<script>
 	^ self
-		exportOnPackages: self defaultPackages
+		exportOnPackages: self defaultPackages1
 		context: #surroundingCompletion
 		outputFormat: #reranker
 		qualityFilter: nil
@@ -280,26 +292,49 @@ CooCompletionFineTuningDatasetExporter >> entries [
 ]
 
 { #category : 'accessing' }
+CooCompletionFineTuningDatasetExporter >> entriesAsFimJsonlString [
+
+	^ String cr join: (entries collect: [ :entry |
+		NeoJSONWriter toString: (Dictionary new
+			at: 'prompt' put: (self fimPromptFor: entry);
+			at: 'completion' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
+			at: 'prefix_code' put: (entry at: #context);
+			at: 'suffix_code' put: (entry at: #suffix ifAbsent: [ '' ]);
+			at: 'target' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
+			at: 'language' put: 'Smalltalk';
+			at: 'completion_kind' put: (entry at: #completionKind ifAbsent: [ 'unknown' ]);
+			at: 'receiver_type' put: (entry at: #receiverType ifAbsent: [ '' ]);
+			at: 'prefix' put: (entry at: #prefix ifAbsent: [ '' ]);
+			yourself) ])
+]
+
+{ #category : 'accessing' }
 CooCompletionFineTuningDatasetExporter >> entriesAsJsonlString [
 
-	^ self entriesAsRerankerJsonlString
+	^ self entriesAsFimJsonlString
 ]
 
 { #category : 'accessing' }
 CooCompletionFineTuningDatasetExporter >> entriesAsRerankerJsonlString [
 
 	^ String cr join: (entries collect: [ :entry |
-		NeoJSONWriter toString: (Dictionary new
-			at: 'context_before' put: (entry at: #context);
-			at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
-			at: 'language' put: 'Smalltalk';
-			at: 'completion_kind' put: (entry at: #completionKind ifAbsent: [ 'unknown' ]);
-			at: 'receiver_type' put: (entry at: #receiverType ifAbsent: [ '' ]);
-			at: 'prefix' put: (entry at: #prefix ifAbsent: [ '' ]);
-			at: 'gold_text' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
-			at: 'correct' put: (entry at: #correct);
-			at: 'candidates' put: (self candidateDictionariesFor: entry);
-			yourself) ])
+				   | positive negatives |
+				   positive := entry at: #correct.
+				   negatives := self negativeCandidatesFor: entry excluding: positive.
+				   NeoJSONWriter toString: (Dictionary new
+						    at: 'query' put: (self rerankerQueryFor: entry);
+						    at: 'positive' put: (Array with: positive);
+						    at: 'negative' put: negatives;
+						    at: 'context_before' put: (entry at: #context);
+						    at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
+						    at: 'language' put: 'Smalltalk';
+						    at: 'completion_kind' put: (entry at: #completionKind ifAbsent: [ 'unknown' ]);
+						    at: 'receiver_type' put: (entry at: #receiverType ifAbsent: [ '' ]);
+						    at: 'prefix' put: (entry at: #prefix ifAbsent: [ '' ]);
+						    at: 'gold_text' put: positive;
+						    at: 'correct' put: positive;
+						    at: 'candidates' put: (self candidateDictionariesFor: entry);
+						    yourself) ])
 ]
 
 { #category : 'benchmarks' }
@@ -315,12 +350,24 @@ CooCompletionFineTuningDatasetExporter >> fetchTopCandidatesFrom: completion usi
 	^ completion first: 10
 ]
 
+{ #category : 'accessing' }
+CooCompletionFineTuningDatasetExporter >> fimPromptFor: entry [
+
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: '<|fim_prefix|>';
+			nextPutAll: (entry at: #context);
+			nextPutAll: '<|fim_suffix|>';
+			nextPutAll: (entry at: #suffix ifAbsent: [ '' ]);
+			nextPutAll: '<|fim_middle|>' ]
+]
+
 { #category : 'initialization' }
 CooCompletionFineTuningDatasetExporter >> initialize [
 
 	super initialize.
 	entries := OrderedCollection new.
-	outputFormat := #reranker.
+	outputFormat := #fim.
 	contextStrategy := #surroundingCompletion.
 	qualityFilter := nil
 ]
@@ -370,6 +417,19 @@ CooCompletionFineTuningDatasetExporter >> messageMetadataFor: aMessageNode inMet
 		yourself
 ]
 
+{ #category : 'benchmarks' }
+CooCompletionFineTuningDatasetExporter >> negativeCandidatesFor: entry excluding: positiveText [
+
+	| seen negatives |
+	seen := Set with: positiveText.
+	negatives := OrderedCollection new.
+	(entry at: #candidates ifAbsent: [ #() ]) do: [ :candidate |
+		(seen includes: candidate) ifFalse: [
+			seen add: candidate.
+			negatives add: candidate ] ].
+	^ negatives asArray
+]
+
 { #category : 'accessing' }
 CooCompletionFineTuningDatasetExporter >> outputFormat [
 
@@ -392,6 +452,22 @@ CooCompletionFineTuningDatasetExporter >> qualityFilter [
 CooCompletionFineTuningDatasetExporter >> qualityFilter: anObject [
 
 	qualityFilter := anObject
+]
+
+{ #category : 'benchmarks' }
+CooCompletionFineTuningDatasetExporter >> receiverTypeFor: aMessageNode inMethod: aMethod [
+
+	| receiver binding |
+	receiver := aMessageNode receiver.
+	receiver ifNil: [ ^ '' ].
+	((receiver respondsTo: #isSelfVariable) and: [ receiver isSelfVariable ]) ifTrue: [
+		^ aMethod methodClass ifNil: [ '' ] ifNotNil: [ aMethod methodClass name ] ].
+	((receiver respondsTo: #isSuperVariable) and: [ receiver isSuperVariable ]) ifTrue: [
+		^ aMethod methodClass ifNil: [ '' ] ifNotNil: [ aMethod methodClass superclass ifNil: [ '' ] ifNotNil: [ aMethod methodClass superclass name ] ] ].
+	((receiver respondsTo: #isLiteralNode) and: [ receiver isLiteralNode ]) ifTrue: [ ^ receiver value class name ].
+	(receiver respondsTo: #binding) ifTrue: [ binding := receiver binding. binding ifNotNil: [ (binding respondsTo: #name) ifTrue: [ ^ binding name asString ] ] ].
+	(receiver respondsTo: #name) ifTrue: [ ^ receiver name asString ].
+	^ ''
 ]
 
 { #category : 'accessing' }
@@ -423,19 +499,13 @@ CooCompletionFineTuningDatasetExporter >> recordContext: context suffix: suffixC
 ]
 
 { #category : 'benchmarks' }
-CooCompletionFineTuningDatasetExporter >> receiverTypeFor: aMessageNode inMethod: aMethod [
+CooCompletionFineTuningDatasetExporter >> rerankerQueryFor: entry [
 
-	| receiver binding |
-	receiver := aMessageNode receiver.
-	receiver ifNil: [ ^ '' ].
-	((receiver respondsTo: #isSelfVariable) and: [ receiver isSelfVariable ]) ifTrue: [
-		^ aMethod methodClass ifNil: [ '' ] ifNotNil: [ aMethod methodClass name ] ].
-	((receiver respondsTo: #isSuperVariable) and: [ receiver isSuperVariable ]) ifTrue: [
-		^ aMethod methodClass ifNil: [ '' ] ifNotNil: [ aMethod methodClass superclass ifNil: [ '' ] ifNotNil: [ aMethod methodClass superclass name ] ] ].
-	((receiver respondsTo: #isLiteralNode) and: [ receiver isLiteralNode ]) ifTrue: [ ^ receiver value class name ].
-	(receiver respondsTo: #binding) ifTrue: [ binding := receiver binding. binding ifNotNil: [ (binding respondsTo: #name) ifTrue: [ ^ binding name asString ] ] ].
-	(receiver respondsTo: #name) ifTrue: [ ^ receiver name asString ].
-	^ ''
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: (entry at: #context);
+			nextPutAll: '<|candidate_slot|>';
+			nextPutAll: (entry at: #suffix ifAbsent: [ '' ]) ]
 ]
 
 { #category : 'running' }

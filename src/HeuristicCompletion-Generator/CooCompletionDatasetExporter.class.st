@@ -229,6 +229,7 @@ CooCompletionDatasetExporter >> entriesAsJsonlString [
 { #category : 'accessing' }
 CooCompletionDatasetExporter >> entriesAsRerankerJsonlString [
 
+	| negatives |
 	^ String cr join: (entries collect: [ :entry |
 				   | correct candidateTexts fetchers candidates correctFound |
 				   correct := entry at: #correct.
@@ -236,20 +237,22 @@ CooCompletionDatasetExporter >> entriesAsRerankerJsonlString [
 				   fetchers := entry at: #fetchers.
 				   correctFound := false.
 
-				    candidates := OrderedCollection new.
-		   1 to: candidateTexts size do: [ :rank |
-			   | text isCorrect |
-			   text := candidateTexts at: rank.
-			   isCorrect := text = correct.
-			   isCorrect ifTrue: [ correctFound := true ].
-			   candidates add: (Dictionary new
-					    at: 'text' put: text;
-					    at: 'fetcher' put: (fetchers at: rank ifAbsent: [ '' ]);
-					    at: 'baseline_rank' put: rank;
-					    at: 'label' put: (isCorrect
-							     ifTrue: [ 1 ]
-							     ifFalse: [ 0 ]);
-					    yourself) ].
+				   candidates := OrderedCollection new.
+				   1 to: candidateTexts size do: [ :rank |
+						   | text isCorrect |
+						   text := candidateTexts at: rank.
+						   isCorrect := text = correct.
+						   isCorrect ifTrue: [ correctFound := true ].
+						   candidates add: (Dictionary new
+								    at: 'text' put: text;
+								    at: 'fetcher' put: (fetchers at: rank ifAbsent: [ '' ]);
+								    at: 'baseline_rank' put: rank;
+								    at: 'label' put: (isCorrect
+										     ifTrue: [ 1 ]
+										     ifFalse: [ 0 ]);
+								    yourself) ].
+							 negatives := self rerankerNegativeCandidatesFrom: candidateTexts excluding: correct.
+							
 
 				   correctFound ifFalse: [
 						   candidates := candidates copyWith: (Dictionary new
@@ -260,9 +263,13 @@ CooCompletionDatasetExporter >> entriesAsRerankerJsonlString [
 								                  yourself) ].
 
 				   NeoJSONWriter toString: (Dictionary new
+				   at: 'query' put: (entry at: #context);
+						    at: 'positive' put: (Array with: correct);
+						    at: 'negative' put: negatives;
 						    at: 'context_before' put: (entry at: #context);
 						    at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
 						    at: 'language' put: 'Smalltalk';
+						 at: 'correct' put: correct;
 						    at: 'candidates' put: candidates;
 						    yourself) ])
 ]
@@ -373,6 +380,19 @@ CooCompletionDatasetExporter >> recordContext: context suffix: suffixCode target
 			 at: #fetchers put: (candidates collect: [ :each | self recordCandidateInfoFor: each ]);
 			 at: #correct put: originalValue;
 			 yourself)
+]
+
+{ #category : 'benchmarks' }
+CooCompletionDatasetExporter >> rerankerNegativeCandidatesFrom: candidateTexts excluding: correctText [
+
+	| seen negatives |
+	seen := Set with: correctText.
+	negatives := OrderedCollection new.
+	candidateTexts do: [ :candidate |
+		(seen includes: candidate) ifFalse: [
+			seen add: candidate.
+			negatives add: candidate ] ].
+	^ negatives asArray
 ]
 
 { #category : 'accessing' }
