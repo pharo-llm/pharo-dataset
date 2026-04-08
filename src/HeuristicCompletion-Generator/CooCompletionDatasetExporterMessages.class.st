@@ -16,7 +16,20 @@ Class {
 	#package : 'HeuristicCompletion-Generator'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'runner' }
+CooCompletionDatasetExporterMessages class >> exportAllMessagesInfillFilteredJsonl [
+
+	<script>
+	^ self
+		  exportOnPackages: self defaultPackages1
+		  heuristics: [ :builder | builder messagesHeuristic ]
+		  context: #surroundingCompletion
+		  outputFormat: #infill
+		  qualityFilter: CooFimDataQualityFilter default
+		  toJsonl: 'infill-messages-filtered.jsonl'
+]
+
+{ #category : 'runner' }
 CooCompletionDatasetExporterMessages class >> exportAllMessagesInfillJsonl [
 
 	<script>
@@ -28,7 +41,7 @@ CooCompletionDatasetExporterMessages class >> exportAllMessagesInfillJsonl [
 		  toJsonl: 'infill-messages.jsonl'
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'runner' }
 CooCompletionDatasetExporterMessages class >> exportAllMessagesRerankerJsonl [
 
 	<script>

@@ -15,7 +15,20 @@ Class {
 	#package : 'HeuristicCompletion-Generator'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'runner' }
+CooCompletionDatasetExporterVariables class >> exportAllVariablesInfillFilteredJsonl [
+
+	<script>
+	^ self
+		  exportOnPackages: self defaultPackages1
+		  heuristics: [ :builder | builder variablesHeuristic ]
+		  context: #surroundingCompletion
+		  outputFormat: #infill
+		  qualityFilter: CooFimDataQualityFilter default
+		  toJsonl: 'infill-variables-filtered.jsonl'
+]
+
+{ #category : 'runner' }
 CooCompletionDatasetExporterVariables class >> exportAllVariablesInfillJsonl [
 
 	<script>
@@ -27,12 +40,12 @@ CooCompletionDatasetExporterVariables class >> exportAllVariablesInfillJsonl [
 		  toJsonl: 'infill-variables.jsonl'
 ]
 
-{ #category : 'as yet unclassified' }
+{ #category : 'runner' }
 CooCompletionDatasetExporterVariables class >> exportAllVariablesRerankerJsonl [
 
 	<script>
 	^ self
-		  exportOnPackages: self defaultPackages
+		  exportOnPackages: self defaultPackages1
 		  heuristics: [ :builder | builder variablesHeuristic ]
 		  context: #surroundingCompletion
 		  outputFormat: #reranker

@@ -12,7 +12,8 @@ Class {
 	#instVars : [
 		'entries',
 		'contextStrategy',
-		'outputFormat'
+		'outputFormat',
+		'qualityFilter'
 	],
 	#category : 'HeuristicCompletion-Generator',
 	#package : 'HeuristicCompletion-Generator'
@@ -77,6 +78,30 @@ CooCompletionDatasetExporter class >> defaultPackages [
 CooCompletionDatasetExporter class >> defaultPackages1 [
 
 	^ #( 'NECompletion' )
+]
+
+{ #category : 'as yet unclassified' }
+CooCompletionDatasetExporter class >> exportOnPackages: aCollectionOfPackages heuristics: aHeuristicsBlock context: aContextStrategy outputFormat: anOutputFormat qualityFilter: aFilter toJsonl: aPathString [ 
+
+	| exporter |
+	exporter := self new
+		            builder: CoASTHeuristicsResultSetBuilder new;
+		            contextStrategy: aContextStrategy;
+		            outputFormat: anOutputFormat;
+		            qualityFilter: aFilter;
+		            yourself.
+
+	aHeuristicsBlock ifNotNil: [ aHeuristicsBlock value: exporter builder ].
+	aCollectionOfPackages do: [ :packageOrName |
+		| package |
+		package := packageOrName isString
+			           ifTrue: [ PackageOrganizer default packageNamed: packageOrName ]
+			           ifFalse: [ packageOrName ].
+		package ifNil: [ ^ self error: 'Package not found: ' , packageOrName printString ].
+		exporter scope: (CoBenchmarkPackage on: package).
+		exporter run ].
+	exporter writeToFileNamedAsJsonl: aPathString.
+	^ exporter
 ]
 
 { #category : 'as yet unclassified' }
@@ -168,59 +193,26 @@ CooCompletionDatasetExporter >> entries [
 ]
 
 { #category : 'accessing' }
-CooCompletionDatasetExporter >> entriesAsCompletionJsonString [
-
-	^ NeoJSONWriter toString: (entries collect: [ :entry |
-		   Dictionary new
-			   at: 'context' put: (entry at: #context);
-			   at: 'candidates' put: (entry at: #candidates);
-			at: 'fetchers' put: (entry at: #fetchers);
-			   at: 'correct' put: (entry at: #correct);
-			   yourself ])
-]
-
-{ #category : 'accessing' }
 CooCompletionDatasetExporter >> entriesAsCompletionJsonlString [
 
-	^ String cr join: (entries collect: [ :entry |
-		   NeoJSONWriter toString: (Dictionary new
-				   at: 'context' put: (entry at: #context);
-				   at: 'candidates' put: (entry at: #candidates);
-				   at: 'fetchers' put: (entry at: #fetchers);
-				   at: 'correct' put: (entry at: #correct);
-				   yourself) ])
-]
-
-{ #category : 'initialization' }
-CooCompletionDatasetExporter >> entriesAsInfillJsonString [
-
-	^ NeoJSONWriter toString: (entries collect: [ :entry |
-		   Dictionary new
-			   at: 'prefix_code' put: (entry at: #context);
-			   at: 'suffix_code' put: (entry at: #suffix ifAbsent: [ '' ]);
-			   at: 'target' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
-			   yourself ])
+	^ String cr join: (self filteredEntries collect: [ :entry |
+				   NeoJSONWriter toString: (Dictionary new
+						    at: 'context' put: (entry at: #context);
+						    at: 'candidates' put: (entry at: #candidates);
+						    at: 'fetchers' put: (entry at: #fetchers);
+						    at: 'correct' put: (entry at: #correct);
+						    yourself) ])
 ]
 
 { #category : 'accessing' }
 CooCompletionDatasetExporter >> entriesAsInfillJsonlString [
 
-	^ String cr join: (entries collect: [ :entry |
-		   NeoJSONWriter toString: (Dictionary new
-				   at: 'prefix_code' put: (entry at: #context);
-				   at: 'suffix_code' put: (entry at: #suffix ifAbsent: [ '' ]);
-				   at: 'target' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
-				   yourself) ])
-]
-
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporter >> entriesAsJsonString [
-
-	^ outputFormat
-		  caseOf: {
-				  ([ #infill ] -> [ self entriesAsInfillJsonString ]).
-				  ([ #reranker ] -> [ self entriesAsRerankerJsonString ]) }
-		  otherwise: [ self entriesAsCompletionJsonString ]
+	^ String cr join: (self filteredEntries collect: [ :entry |
+				   NeoJSONWriter toString: (Dictionary new
+						    at: 'prefix_code' put: (entry at: #context);
+						    at: 'suffix_code' put: (entry at: #suffix ifAbsent: [ '' ]);
+						    at: 'target' put: (entry at: #target ifAbsent: [ entry at: #correct ]);
+						    yourself) ])
 ]
 
 { #category : 'accessing' }
@@ -234,82 +226,53 @@ CooCompletionDatasetExporter >> entriesAsJsonlString [
 		  otherwise: [ self entriesAsCompletionJsonlString ]
 ]
 
-{ #category : 'as yet unclassified' }
-CooCompletionDatasetExporter >> entriesAsRerankerJsonString [
-
-	^ NeoJSONWriter toString: (entries collect: [ :entry |
-		   | correct candidateTexts fetchers candidates correctFound |
-		   correct := entry at: #correct.
-		   candidateTexts := entry at: #candidates.
-		   fetchers := entry at: #fetchers.
-		   correctFound := false.
-
-		   candidates := candidateTexts withIndex collect: [ :text :rank |
-			                   | isCorrect |
-			                   isCorrect := text = correct.
-			                   isCorrect ifTrue: [ correctFound := true ].
-			                   Dictionary new
-				                   at: 'text' put: text;
-				                   at: 'fetcher' put: (fetchers at: rank ifAbsent: [ '' ]);
-				                   at: 'baseline_rank' put: rank;
-				                   at: 'label' put: (isCorrect
-						                    ifTrue: [ 1 ]
-						                    ifFalse: [ 0 ]);
-				                   yourself ].
-
-		   correctFound ifFalse: [
-			   candidates := candidates copyWith: (Dictionary new
-					                    at: 'text' put: correct;
-					                    at: 'fetcher' put: '';
-					                    at: 'baseline_rank' put: candidates size + 1;
-					                    at: 'label' put: 1;
-					                    yourself) ].
-
-		   Dictionary new
-			   at: 'context_before' put: (entry at: #context);
-			   at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
-			   at: 'language' put: 'Smalltalk';
-			   at: 'candidates' put: candidates;
-			   yourself ])
-]
-
 { #category : 'accessing' }
 CooCompletionDatasetExporter >> entriesAsRerankerJsonlString [
 
 	^ String cr join: (entries collect: [ :entry |
-		   | correct candidateTexts fetchers candidates correctFound |
-		   correct := entry at: #correct.
-		   candidateTexts := entry at: #candidates.
-		   fetchers := entry at: #fetchers.
-		   correctFound := false.
+				   | correct candidateTexts fetchers candidates correctFound |
+				   correct := entry at: #correct.
+				   candidateTexts := entry at: #candidates.
+				   fetchers := entry at: #fetchers.
+				   correctFound := false.
 
-		   candidates := candidateTexts withIndex collect: [ :text :rank |
-			                   | isCorrect |
-			                   isCorrect := text = correct.
-			                   isCorrect ifTrue: [ correctFound := true ].
-			                   Dictionary new
-				                   at: 'text' put: text;
-				                   at: 'fetcher' put: (fetchers at: rank ifAbsent: [ '' ]);
-				                   at: 'baseline_rank' put: rank;
-				                   at: 'label' put: (isCorrect
-						                    ifTrue: [ 1 ]
-						                    ifFalse: [ 0 ]);
-				                   yourself ].
+				    candidates := OrderedCollection new.
+		   1 to: candidateTexts size do: [ :rank |
+			   | text isCorrect |
+			   text := candidateTexts at: rank.
+			   isCorrect := text = correct.
+			   isCorrect ifTrue: [ correctFound := true ].
+			   candidates add: (Dictionary new
+					    at: 'text' put: text;
+					    at: 'fetcher' put: (fetchers at: rank ifAbsent: [ '' ]);
+					    at: 'baseline_rank' put: rank;
+					    at: 'label' put: (isCorrect
+							     ifTrue: [ 1 ]
+							     ifFalse: [ 0 ]);
+					    yourself) ].
 
-		   correctFound ifFalse: [
-			   candidates := candidates copyWith: (Dictionary new
-					                    at: 'text' put: correct;
-					                    at: 'fetcher' put: '';
-					                    at: 'baseline_rank' put: candidates size + 1;
-					                    at: 'label' put: 1;
-					                    yourself) ].
+				   correctFound ifFalse: [
+						   candidates := candidates copyWith: (Dictionary new
+								                  at: 'text' put: correct;
+								                  at: 'fetcher' put: '';
+								                  at: 'baseline_rank' put: candidates size + 1;
+								                  at: 'label' put: 1;
+								                  yourself) ].
 
-		   NeoJSONWriter toString: (Dictionary new
-				   at: 'context_before' put: (entry at: #context);
-				   at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
-				   at: 'language' put: 'Smalltalk';
-				   at: 'candidates' put: candidates;
-				   yourself) ])
+				   NeoJSONWriter toString: (Dictionary new
+						    at: 'context_before' put: (entry at: #context);
+						    at: 'context_after' put: (entry at: #suffix ifAbsent: [ '' ]);
+						    at: 'language' put: 'Smalltalk';
+						    at: 'candidates' put: candidates;
+						    yourself) ])
+]
+
+{ #category : 'accessing' }
+CooCompletionDatasetExporter >> filteredEntries [
+	"Return entries after applying the quality filter, if one is set."
+
+	qualityFilter ifNil: [ ^ entries ].
+	^ qualityFilter filter: entries
 ]
 
 { #category : 'initialization' }
@@ -317,7 +280,8 @@ CooCompletionDatasetExporter >> initialize [
 
 	super initialize.
 	entries := OrderedCollection new.
-	outputFormat := #completion
+	outputFormat := #completion.
+	qualityFilter := nil
 ]
 
 { #category : 'Protocol (as yet unclassified) - 4 selector(s)' }
@@ -357,6 +321,18 @@ CooCompletionDatasetExporter >> outputFormat [
 CooCompletionDatasetExporter >> outputFormat: aSymbol [
 
 	outputFormat := aSymbol
+]
+
+{ #category : 'initialization' }
+CooCompletionDatasetExporter >> qualityFilter [
+
+	^ qualityFilter
+]
+
+{ #category : 'initialization' }
+CooCompletionDatasetExporter >> qualityFilter: aFilter [
+
+	qualityFilter := aFilter
 ]
 
 { #category : 'accessing' }
